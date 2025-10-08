@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ドッカン戦車バトル Online</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <main class="layout">
+    <section class="hud">
+      <div class="hud__item">
+        <span class="label">HP</span>
+        <progress id="hp-bar" max="100" value="100"></progress>
+      </div>
+      <div class="hud__item">
+        <span class="label">相手HP</span>
+        <progress id="enemy-hp-bar" max="100" value="100"></progress>
+      </div>
+      <div class="hud__item">
+        <span class="label">ドッカンゲージ</span>
+        <progress id="skill-bar" max="100" value="0"></progress>
+      </div>
+      <div class="hud__item">
+        <span class="label">ステータス</span>
+        <span id="status-text">サーバー接続中...</span>
+      </div>
+    </section>
+
+    <section class="viewport">
+      <canvas id="game" width="960" height="600"></canvas>
+    </section>
+
+    <section class="controls">
+      <div>
+        <h2>操作</h2>
+        <ul>
+          <li>移動: WASD / 矢印キー</li>
+          <li>砲塔: マウスで照準</li>
+          <li>射撃: 左クリック</li>
+          <li>ドッカン: ゲージ100%でスペースキー</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <div id="matchmaking-overlay" class="overlay hidden">
+    <div class="overlay__panel">
+      <h1>対戦相手を検索中...</h1>
+      <p>相手が接続すると自動で開始します。</p>
+    </div>
+  </div>
+
+  <div id="result-overlay" class="overlay hidden">
+    <div class="overlay__panel">
+      <h1 id="result-text"></h1>
+      <button id="restart-button">もう一度対戦</button>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
