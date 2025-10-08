@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ドッカン戦車バトル</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="top-bar">
+    <h1>ドッカン戦車バトル</h1>
+    <div class="status">
+      <div class="status__item">スコア: <span id="score">0</span></div>
+      <div class="status__item">残り敵数: <span id="enemies">0</span></div>
+      <div class="status__item">ライフ: <span id="life">100</span></div>
+      <div class="status__item">ドッカンゲージ: <span id="skill">0%</span></div>
+    </div>
+  </header>
+
+  <main class="container">
+    <canvas id="game" width="960" height="540" aria-label="ドッカン戦車バトルの戦場"></canvas>
+    <aside class="hud">
+      <section class="panel">
+        <h2>遊び方</h2>
+        <ul>
+          <li><span class="key">WASD</span> / <span class="key">矢印キー</span> … 戦車の移動</li>
+          <li><span class="key">J</span> / <span class="key">スペース</span> … 砲弾発射</li>
+          <li><span class="key">K</span> … ドッカンスキル（チャージが必要）</li>
+        </ul>
+      </section>
+      <section class="panel">
+        <h2>ストーリー</h2>
+        <p>
+          北の荒野に突如出現した暴走戦車部隊。ドッカンスキルを活用して敵の増援を制圧し、
+          最強の砲撃手として戦場を駆け抜けろ！
+        </p>
+      </section>
+      <button id="start" class="primary">バトル開始</button>
+    </aside>
+  </main>
+
+  <div id="overlay" class="overlay hidden" role="alertdialog" aria-live="assertive">
+    <div class="overlay__card">
+      <h2 id="overlay-title">ミッション開始</h2>
+      <p id="overlay-message">「出撃する」を押してドッカン出撃だ！</p>
+      <button id="restart" class="primary">出撃する</button>
+    </div>
+  </div>
+
+  <script src="script.js" type="module"></script>
+</body>
+</html>
