@@ -24,6 +24,12 @@
 1. ブラウザで `http://localhost:3000` を開きます。
 2. 最初の 2 クライアントが同じルームにマッチングされ、ゲームが開始されます。
 
+### 離れた友だちと遊ぶには？
+- サーバーをインターネット越しに公開している場合、クライアント URL に `?server=<WebSocket サーバー URL>` を付けると任意のサーバーへ接続できます。
+  - 例: `https://example.com?server=wss://example.com/game`
+- 静的ホスティングサービスなどで HTML を直接配信している場合も、サーバー URL を指定すればオンライン対戦が可能です。
+- JavaScript から直接指定したい場合は `window.GAME_SERVER_URL = "wss://example.com/game";` を設定してから `js/main.js` を読み込んでください。
+
 ## 開発モード
 変更のたびにサーバーを自動再起動したい場合は nodemon を使った開発モードを利用できます。
 ```bash
