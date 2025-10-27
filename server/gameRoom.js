@@ -21,6 +21,8 @@ export class GameRoom {
     this.skillReady = new Set();
     this.matchOver = false;
     this.countdownHandles = [];
+    this.readyPlayers = new Set();
+    this.phase = "waiting";
   }
 
   addPlayer(connection) {
@@ -39,32 +41,44 @@ export class GameRoom {
       lastSkillUse: 0,
     };
     this.players.set(connection.id, player);
-    this.broadcast({ type: "matchmaking", payload: { waiting: this.players.size < 2 } });
-    if (this.players.size === 2) {
-      this.skillReady.clear();
-      this.players.forEach((p) => (p.hp = MAX_HP));
+    this.readyPlayers.delete(connection.id);
+    this.cancelCountdown();
+    if (this.players.size >= 2) {
+      this.prepareLobby();
+      this.phase = "ready";
+    } else {
+      this.phase = "waiting";
       this.matchOver = false;
+      this.skillReady.clear();
     }
+    this.broadcastMatchStatus();
   }
 
   removePlayer(id) {
     this.players.delete(id);
     this.bullets.clear();
     this.matchOver = false;
+    this.readyPlayers.delete(id);
     this.cancelCountdown();
-    this.broadcast({ type: "matchmaking", payload: { waiting: true } });
-    this.broadcast({ type: "state", payload: this.serialize() });
+    if (this.players.size >= 2) {
+      this.phase = "ready";
+      this.prepareLobby();
+    } else {
+      this.phase = "waiting";
+      this.prepareLobby();
+    }
+    this.broadcastMatchStatus();
   }
 
   handleInput(playerId, input) {
     const player = this.players.get(playerId);
-    if (!player || this.matchOver) return;
+    if (!player) return;
     player.input = { ...player.input, ...sanitizeInput(input) };
   }
 
   handleSkill(playerId) {
     const player = this.players.get(playerId);
-    if (!player || this.matchOver) return;
+    if (!player || this.phase !== "active") return;
     const now = Date.now();
     const ready = this.skillReady.has(playerId) || now - player.lastSkillUse >= SKILL_COOLDOWN;
     if (!ready) return;
@@ -77,45 +91,36 @@ export class GameRoom {
 
   handleRestart(playerId) {
     if (this.players.size < 2) return;
-    if (!this.matchOver) return;
+    if (this.phase !== "finished" && this.phase !== "ready") return;
+    this.handleReady(playerId, true);
+  }
+
+  handleReady(playerId, ready) {
+    if (!this.players.has(playerId)) return;
+    if (this.players.size < 2) return;
+    if (this.phase === "countdown") return;
+    if (this.phase !== "ready" && this.phase !== "finished") return;
+    if (!ready) {
+      this.readyPlayers.delete(playerId);
+    } else {
+      this.readyPlayers.add(playerId);
+    }
+    this.broadcastMatchStatus();
+    if (this.readyPlayers.size === this.players.size && this.players.size === 2) {
+      this.startCountdown();
+    }
+  }
+
+  startCountdown() {
     if (this.countdownHandles.length > 0) return;
-    this.startRestartCountdown();
-  }
-
-  resetMatch() {
-    const positions = [
-      { x: ARENA.padding + 100, y: ARENA.height / 2 },
-      { x: ARENA.width - ARENA.padding - 100, y: ARENA.height / 2 },
-    ];
-    let index = 0;
-    this.players.forEach((player) => {
-      Object.assign(player, {
-        x: positions[index].x,
-        y: positions[index].y,
-        bodyAngle: 0,
-        turretAngle: 0,
-        hp: MAX_HP,
-        input: createEmptyInput(),
-        lastShot: 0,
-        isSkillActive: false,
-        skillActivatedAt: 0,
-      });
-      index += 1;
-    });
-    this.bullets.clear();
-    this.matchOver = false;
-    this.skillReady.clear();
-    this.broadcast({ type: "state", payload: this.serialize() });
-    this.broadcast({ type: "matchmaking", payload: { waiting: false } });
-  }
-
-  startRestartCountdown() {
+    this.phase = "countdown";
+    this.broadcastMatchStatus();
     const steps = [3, 2, 1, "START!"];
     this.countdownHandles = steps.map((step, index) =>
       setTimeout(() => {
         this.broadcast({ type: "countdown", payload: { value: step } });
         if (step === "START!") {
-          this.resetMatch();
+          this.beginMatch();
           const hideHandle = setTimeout(() => {
             this.broadcast({ type: "countdown", payload: { value: null } });
             this.countdownHandles = [];
@@ -126,11 +131,36 @@ export class GameRoom {
     );
   }
 
+  beginMatch() {
+    this.resetPlayersToSpawn();
+    this.bullets.clear();
+    this.skillReady.clear();
+    this.matchOver = false;
+    this.phase = "active";
+    this.readyPlayers.clear();
+    this.players.forEach((player) => {
+      this.send(player.id, { type: "skillConsumed" });
+    });
+    this.broadcast({ type: "state", payload: this.serialize() });
+    this.broadcastMatchStatus();
+  }
+
   cancelCountdown() {
     if (!this.countdownHandles.length) return;
     this.countdownHandles.forEach((handle) => clearTimeout(handle));
     this.countdownHandles = [];
     this.broadcast({ type: "countdown", payload: { value: null } });
+  }
+
+  prepareLobby() {
+    this.resetPlayersToSpawn();
+    this.bullets.clear();
+    this.readyPlayers.clear();
+    this.skillReady.clear();
+    this.players.forEach((player) => {
+      this.send(player.id, { type: "skillConsumed" });
+    });
+    this.broadcast({ type: "state", payload: this.serialize() });
   }
 
   update() {
@@ -170,7 +200,7 @@ export class GameRoom {
 
     const now = Date.now();
     const fireDelay = player.isSkillActive ? 150 : 350;
-    if (shooting && now - player.lastShot > fireDelay) {
+    if (this.phase === "active" && shooting && now - player.lastShot > fireDelay) {
       this.spawnBullet(player);
       player.lastShot = now;
     }
@@ -275,15 +305,18 @@ export class GameRoom {
   }
 
   checkOutcome() {
-    if (this.matchOver) return;
+    if (this.phase !== "active" || this.matchOver) return;
     const livingPlayers = Array.from(this.players.values()).filter((p) => p.hp > 0);
     if (livingPlayers.length >= 2) return;
     this.matchOver = true;
+    this.phase = "finished";
+    this.readyPlayers.clear();
     this.bullets.clear();
     this.players.forEach((player) => {
       const result = player.hp > 0 ? "win" : "lose";
       this.send(player.id, { type: "outcome", payload: { result } });
     });
+    this.broadcastMatchStatus();
   }
 
   serialize() {
@@ -313,6 +346,36 @@ export class GameRoom {
   send(playerId, message) {
     const player = this.players.get(playerId);
     player?.connection.send(JSON.stringify(message));
+  }
+
+  broadcastMatchStatus() {
+    const players = Array.from(this.players.values()).map((player) => ({
+      id: player.id,
+      ready: this.readyPlayers.has(player.id),
+    }));
+    this.broadcast({ type: "matchStatus", payload: { phase: this.phase, players } });
+  }
+
+  resetPlayersToSpawn() {
+    const positions = [
+      { x: ARENA.padding + 100, y: ARENA.height / 2 },
+      { x: ARENA.width - ARENA.padding - 100, y: ARENA.height / 2 },
+    ];
+    let index = 0;
+    this.players.forEach((player) => {
+      Object.assign(player, {
+        x: positions[index % positions.length].x,
+        y: positions[index % positions.length].y,
+        bodyAngle: 0,
+        turretAngle: 0,
+        hp: MAX_HP,
+        input: createEmptyInput(),
+        lastShot: 0,
+        isSkillActive: false,
+        skillActivatedAt: 0,
+      });
+      index += 1;
+    });
   }
 }
 

@@ -111,6 +111,11 @@ wss.on("connection", (ws) => {
       case "restart":
         activeRoom?.handleRestart(connection.id);
         break;
+      case "ready": {
+        const ready = Boolean(message.payload?.ready);
+        activeRoom?.handleReady(connection.id, ready);
+        break;
+      }
       case "joinRoom": {
         const targetId = message.payload?.roomId;
         if (!targetId) return;

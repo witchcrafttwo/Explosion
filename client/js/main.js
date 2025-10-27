@@ -11,26 +11,37 @@ const ui = new UIController(state);
 let network = null;
 let input = null;
 
-function triggerRestart() {
-  if (state.outcome) {
+function setReady(desired) {
+  const allowedPhases = new Set(["ready", "finished"]);
+  if (!allowedPhases.has(state.matchPhase)) {
+    return;
+  }
+  if (desired && state.outcome) {
     state.outcome = null;
     ui.showResult(null);
-    ui.showMatchmaking(true);
   }
-  network?.requestRestart();
+  network?.sendReady(desired);
+  state.ready = desired;
+  ui.updateMatchStatus({
+    phase: state.matchPhase,
+    ready: state.ready,
+    opponentReady: state.opponentReady,
+  });
+}
+
+function toggleReady() {
+  setReady(!state.ready);
 }
 
 function init() {
-  ui.showMatchmaking(true);
   ui.setStatus("サーバー接続中...");
-  ui.bindRestart(triggerRestart);
+  ui.bindRestart(() => setReady(true));
+  ui.bindReady(toggleReady);
   ui.bindRoomActions({
     onJoin: (roomId) => {
-      ui.showMatchmaking(true);
       network?.joinRoom(roomId);
     },
     onCreate: () => {
-      ui.showMatchmaking(true);
       network?.createRoom();
     },
   });
@@ -41,7 +52,6 @@ function init() {
     },
     onClose: () => {
       ui.setStatus("サーバー切断。再接続中...");
-      ui.showMatchmaking(true);
     },
     onError: () => {
       ui.setStatus("通信エラー");
@@ -57,7 +67,7 @@ function ensureInput() {
     input = new InputController(canvas, {
       onInputChange: (data) => network?.sendInput(data),
       onSkill: () => network?.sendSkill(),
-      onRestart: triggerRestart,
+      onToggleReady: toggleReady,
     });
     input.start();
   }
@@ -68,9 +78,6 @@ function handleServerMessage(message) {
     case "welcome":
       state.setIdentity(message.payload);
       ui.showRoomStatus(message.payload.roomId);
-      break;
-    case "matchmaking":
-      ui.showMatchmaking(message.payload.waiting);
       break;
     case "state":
       state.applyServerState(message.payload);
@@ -88,7 +95,6 @@ function handleServerMessage(message) {
       break;
     case "outcome":
       state.outcome = message.payload.result;
-      ui.showMatchmaking(false);
       ui.showResult(state.outcome);
       break;
     case "rooms":
@@ -103,6 +109,14 @@ function handleServerMessage(message) {
         ui.showResult(null);
       }
       ui.showCountdown(message.payload.value);
+      break;
+    case "matchStatus":
+      state.updateMatchStatus(message.payload);
+      ui.updateMatchStatus({
+        phase: state.matchPhase,
+        ready: state.ready,
+        opponentReady: state.opponentReady,
+      });
       break;
     default:
       console.warn("Unknown message", message);

@@ -14,14 +14,23 @@ export class UIController {
     this.createRoomButton = document.getElementById("create-room-button");
     this.countdownOverlay = document.getElementById("countdown-overlay");
     this.countdownText = document.getElementById("countdown-text");
+    this.readyButton = document.getElementById("ready-button");
+    this.matchStatusDetail = document.getElementById("match-status-detail");
     this.statusResetTimer = null;
+    this.matchStatus = { phase: "waiting", ready: false, opponentReady: false };
+    this.notificationActive = false;
     if (this.joinRoomButton) {
       this.joinRoomButton.disabled = true;
     }
+    this.renderMatchStatus();
   }
 
   bindRestart(handler) {
     this.restartButton.addEventListener("click", handler);
+  }
+
+  bindReady(handler) {
+    this.readyButton?.addEventListener("click", handler);
   }
 
   bindRoomActions({ onJoin, onCreate }) {
@@ -40,10 +49,11 @@ export class UIController {
     });
   }
 
-  setStatus(text, { error = false } = {}) {
+  setStatus(text, { error = false, lock = false } = {}) {
     clearTimeout(this.statusResetTimer);
     this.statusText.textContent = text;
     this.statusText.classList.toggle("status--error", error);
+    this.notificationActive = lock;
   }
 
   showMatchmaking(show) {
@@ -74,18 +84,19 @@ export class UIController {
   showNotification({ level, message }) {
     if (!message) return;
     const isError = level === "error";
-    this.setStatus(message, { error: isError });
+    this.setStatus(message, { error: isError, lock: true });
     this.statusResetTimer = setTimeout(() => {
-      this.showRoomStatus(this.state.roomId);
+      this.notificationActive = false;
+      this.renderMatchStatus();
     }, isError ? 3500 : 2000);
   }
 
   showRoomStatus(roomId) {
     if (!roomId) return;
-    this.setStatus(`ルーム ${roomId} 参加`);
     if (this.roomSelect) {
       this.roomSelect.value = roomId;
     }
+    this.renderMatchStatus();
   }
 
   updateRooms(rooms) {
@@ -120,5 +131,73 @@ export class UIController {
     this.hpBar.value = local ? local.hp : 0;
     this.enemyHpBar.value = enemy ? enemy.hp : 0;
     this.skillBar.value = this.state.skillReady ? 100 : 0;
+  }
+
+  updateMatchStatus({ phase, ready, opponentReady }) {
+    this.matchStatus = { phase, ready, opponentReady };
+    this.renderMatchStatus();
+  }
+
+  renderMatchStatus() {
+    const { phase, ready, opponentReady } = this.matchStatus;
+    let summary = "待機中";
+    let detail = "対戦相手を待っています";
+    let readyDisabled = true;
+    let readyLabel = ready ? "準備解除" : "準備完了";
+
+    switch (phase) {
+      case "waiting":
+        summary = "対戦相手待ち";
+        detail = "対戦相手が参加するまで自由に練習できます";
+        readyDisabled = true;
+        break;
+      case "ready":
+        summary = ready ? "相手の準備待ち" : "準備待ち";
+        detail = ready
+          ? "相手の準備完了を待っています"
+          : "「準備完了」を押して対戦開始を待ちましょう";
+        readyDisabled = false;
+        break;
+      case "countdown":
+        summary = "開始準備中";
+        detail = "カウントダウンが終了すると試合が始まります";
+        readyDisabled = true;
+        break;
+      case "active":
+        summary = "バトル中";
+        detail = "現在試合中です";
+        readyDisabled = true;
+        break;
+      case "finished":
+        summary = ready
+          ? opponentReady
+            ? "開始待ち"
+            : "相手の準備待ち"
+          : "再戦待ち";
+        detail = ready
+          ? opponentReady
+            ? "まもなく再戦が始まります"
+            : "相手の準備完了を待っています"
+          : "再戦するには「準備完了」を押してください";
+        readyDisabled = false;
+        break;
+      default:
+        break;
+    }
+
+    if (this.matchStatusDetail) {
+      this.matchStatusDetail.textContent = detail;
+    }
+    if (this.readyButton) {
+      this.readyButton.textContent = readyLabel;
+      this.readyButton.disabled = readyDisabled;
+      this.readyButton.classList.toggle("ready-button--active", ready && !readyDisabled);
+    }
+
+    if (!this.notificationActive) {
+      const roomText = this.state.roomId ? `ルーム ${this.state.roomId} | ` : "";
+      this.statusText.textContent = `${roomText}${summary}`;
+      this.statusText.classList.remove("status--error");
+    }
   }
 }

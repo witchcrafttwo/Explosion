@@ -43,6 +43,11 @@
         </div>
         <button id="create-room-button" type="button" class="room-selector__create">新しいルームを作成</button>
       </div>
+      <div class="match-ready">
+        <h2>対戦準備</h2>
+        <p id="match-status-detail" class="match-ready__detail">対戦相手を待っています</p>
+        <button id="ready-button" type="button" class="ready-button" disabled>準備完了</button>
+      </div>
       <div>
         <h2>操作</h2>
         <ul>
@@ -50,7 +55,7 @@
           <li>砲塔: マウスで照準</li>
           <li>射撃: 左クリック</li>
           <li>ドッカン: ゲージ100%でスペースキー</li>
-          <li>再戦リクエスト: Rキー</li>
+          <li>準備完了の切り替え: Rキー</li>
         </ul>
       </div>
     </section>
@@ -66,7 +71,7 @@
   <div id="result-overlay" class="overlay hidden">
     <div class="overlay__panel">
       <h1 id="result-text"></h1>
-      <button id="restart-button">もう一度対戦 (R)</button>
+      <button id="restart-button">準備完了 (R)</button>
     </div>
   </div>
 

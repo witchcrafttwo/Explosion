@@ -57,16 +57,16 @@ export class NetworkClient {
     this.send("skill");
   }
 
-  requestRestart() {
-    this.send("restart");
-  }
-
   joinRoom(roomId) {
     this.send("joinRoom", { roomId });
   }
 
   createRoom() {
     this.send("createRoom");
+  }
+
+  sendReady(ready) {
+    this.send("ready", { ready });
   }
 
   dispose() {

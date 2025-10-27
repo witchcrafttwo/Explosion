@@ -97,6 +97,18 @@ canvas {
   gap: 0.75rem;
 }
 
+.match-ready {
+  margin-bottom: 1.5rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.match-ready__detail {
+  margin: 0;
+  font-size: 0.95rem;
+  opacity: 0.8;
+}
+
 .room-selector__hint {
   margin: 0;
   font-size: 0.85rem;
@@ -183,6 +195,18 @@ button {
 button:hover {
   transform: translateY(-1px);
   filter: brightness(1.1);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+}
+
+.ready-button--active {
+  background: linear-gradient(135deg, #66f57a, #55f5d1);
+  color: #02160f;
 }
 
 @media (max-width: 1100px) {
