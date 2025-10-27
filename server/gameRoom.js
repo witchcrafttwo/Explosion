@@ -20,6 +20,7 @@ export class GameRoom {
     this.lastTick = Date.now();
     this.skillReady = new Set();
     this.matchOver = false;
+    this.countdownHandles = [];
   }
 
   addPlayer(connection) {
@@ -50,6 +51,7 @@ export class GameRoom {
     this.players.delete(id);
     this.bullets.clear();
     this.matchOver = false;
+    this.cancelCountdown();
     this.broadcast({ type: "matchmaking", payload: { waiting: true } });
     this.broadcast({ type: "state", payload: this.serialize() });
   }
@@ -75,7 +77,9 @@ export class GameRoom {
 
   handleRestart(playerId) {
     if (this.players.size < 2) return;
-    this.resetMatch();
+    if (!this.matchOver) return;
+    if (this.countdownHandles.length > 0) return;
+    this.startRestartCountdown();
   }
 
   resetMatch() {
@@ -103,6 +107,30 @@ export class GameRoom {
     this.skillReady.clear();
     this.broadcast({ type: "state", payload: this.serialize() });
     this.broadcast({ type: "matchmaking", payload: { waiting: false } });
+  }
+
+  startRestartCountdown() {
+    const steps = [3, 2, 1, "START!"];
+    this.countdownHandles = steps.map((step, index) =>
+      setTimeout(() => {
+        this.broadcast({ type: "countdown", payload: { value: step } });
+        if (step === "START!") {
+          this.resetMatch();
+          const hideHandle = setTimeout(() => {
+            this.broadcast({ type: "countdown", payload: { value: null } });
+            this.countdownHandles = [];
+          }, 800);
+          this.countdownHandles.push(hideHandle);
+        }
+      }, index * 1000)
+    );
+  }
+
+  cancelCountdown() {
+    if (!this.countdownHandles.length) return;
+    this.countdownHandles.forEach((handle) => clearTimeout(handle));
+    this.countdownHandles = [];
+    this.broadcast({ type: "countdown", payload: { value: null } });
   }
 
   update() {

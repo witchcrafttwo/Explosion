@@ -32,6 +32,17 @@
     </section>
 
     <section class="controls">
+      <div class="room-selector">
+        <h2>ルーム選択</h2>
+        <p class="room-selector__hint">一覧からルームを選んで「参加」または新規作成してください。</p>
+        <div class="room-selector__row">
+          <select id="room-select" aria-label="ルーム一覧">
+            <option value="" disabled selected>読み込み中...</option>
+          </select>
+          <button id="join-room-button" type="button">このルームに参加</button>
+        </div>
+        <button id="create-room-button" type="button" class="room-selector__create">新しいルームを作成</button>
+      </div>
       <div>
         <h2>操作</h2>
         <ul>
@@ -39,6 +50,7 @@
           <li>砲塔: マウスで照準</li>
           <li>射撃: 左クリック</li>
           <li>ドッカン: ゲージ100%でスペースキー</li>
+          <li>再戦リクエスト: Rキー</li>
         </ul>
       </div>
     </section>
@@ -54,7 +66,13 @@
   <div id="result-overlay" class="overlay hidden">
     <div class="overlay__panel">
       <h1 id="result-text"></h1>
-      <button id="restart-button">もう一度対戦</button>
+      <button id="restart-button">もう一度対戦 (R)</button>
+    </div>
+  </div>
+
+  <div id="countdown-overlay" class="overlay hidden" aria-live="assertive">
+    <div class="overlay__panel overlay__panel--countdown">
+      <span id="countdown-text" class="countdown-text"></span>
     </div>
   </div>
 

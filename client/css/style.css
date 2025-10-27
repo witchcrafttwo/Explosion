@@ -91,6 +91,37 @@ canvas {
   box-shadow: 0 18px 30px rgba(0, 6, 14, 0.55);
 }
 
+.room-selector {
+  margin-bottom: 1.5rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.room-selector__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.room-selector__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.room-selector__create {
+  justify-self: start;
+}
+
+select {
+  padding: 0.6rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(75, 139, 210, 0.5);
+  background: rgba(10, 22, 35, 0.8);
+  color: inherit;
+}
+
 .controls h2 {
   margin-top: 0;
   font-size: 1.25rem;
@@ -121,6 +152,21 @@ canvas {
   text-align: center;
   border: 1px solid rgba(92, 185, 255, 0.35);
   box-shadow: 0 26px 60px rgba(0, 7, 21, 0.6);
+}
+
+.overlay__panel--countdown {
+  min-width: 220px;
+}
+
+.countdown-text {
+  font-size: 3rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+#status-text.status--error {
+  color: #ff8a8a;
 }
 
 button {
@@ -158,5 +204,18 @@ button:hover {
   .hud,
   .controls {
     padding: 1rem;
+  }
+
+  .room-selector__row {
+    grid-template-columns: 1fr;
+  }
+
+  .room-selector__row > * {
+    width: 100%;
+  }
+
+  .room-selector__create {
+    width: 100%;
+    justify-self: stretch;
   }
 }

@@ -8,16 +8,18 @@ const KEY_BINDINGS = {
   KeyA: "left",
   KeyD: "right",
   Space: "skill",
+  KeyR: "restart",
 };
 
 export class InputController {
-  constructor(canvas, { onInputChange, onSkill }) {
+  constructor(canvas, { onInputChange, onSkill, onRestart }) {
     this.canvas = canvas;
     this.pressed = new Set();
     this.mousePos = { x: 0, y: 0 };
     this.mouseDown = false;
     this.onInputChange = onInputChange;
     this.onSkill = onSkill;
+    this.onRestart = onRestart;
     this.boundKeydown = (event) => this.handleKeydown(event);
     this.boundKeyup = (event) => this.handleKeyup(event);
     this.boundMouseMove = (event) => this.handleMouseMove(event);
@@ -48,6 +50,8 @@ export class InputController {
     if (!action) return;
     if (action === "skill") {
       this.onSkill?.();
+    } else if (action === "restart") {
+      this.onRestart?.();
     } else {
       this.pressed.add(action);
       this.emitInput();
@@ -57,7 +61,7 @@ export class InputController {
 
   handleKeyup(event) {
     const action = KEY_BINDINGS[event.code];
-    if (!action || action === "skill") return;
+    if (!action || action === "skill" || action === "restart") return;
     this.pressed.delete(action);
     this.emitInput();
   }

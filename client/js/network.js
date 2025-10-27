@@ -61,6 +61,14 @@ export class NetworkClient {
     this.send("restart");
   }
 
+  joinRoom(roomId) {
+    this.send("joinRoom", { roomId });
+  }
+
+  createRoom() {
+    this.send("createRoom");
+  }
+
   dispose() {
     this.shouldReconnect = false;
     this.ws?.close();

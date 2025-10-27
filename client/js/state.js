@@ -8,10 +8,13 @@ export class ClientState {
     this.outcome = null;
   }
 
-  applyServerState({ players, bullets, outcome }) {
+  applyServerState({ players, bullets, outcome, roomId }) {
     this.players = players;
     this.bullets = bullets;
     this.outcome = outcome ?? null;
+    if (roomId) {
+      this.roomId = roomId;
+    }
   }
 
   setIdentity({ playerId, roomId }) {
