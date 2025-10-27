@@ -81,7 +81,6 @@ function handleServerMessage(message) {
       break;
     case "state":
       state.applyServerState(message.payload);
-      ui.showRoomStatus(state.roomId);
       ui.updateBars();
       ensureInput();
       break;

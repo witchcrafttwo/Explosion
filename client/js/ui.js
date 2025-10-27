@@ -19,6 +19,7 @@ export class UIController {
     this.statusResetTimer = null;
     this.matchStatus = { phase: "waiting", ready: false, opponentReady: false };
     this.notificationActive = false;
+    this.userSelectedRoomId = null;
     if (this.joinRoomButton) {
       this.joinRoomButton.disabled = true;
     }
@@ -35,9 +36,13 @@ export class UIController {
 
   bindRoomActions({ onJoin, onCreate }) {
     this.roomSelect?.addEventListener("change", () => {
-      if (!this.joinRoomButton) return;
       const selected = this.roomSelect.value;
-      this.joinRoomButton.disabled = !selected || selected === this.state.roomId;
+      this.userSelectedRoomId = selected && selected !== this.state.roomId ? selected : null;
+      this.updateJoinButtonState();
+    });
+    this.roomSelect?.addEventListener("blur", () => {
+      // If focus leaves the select without joining, keep the current choice but refresh buttons.
+      this.updateJoinButtonState();
     });
     this.joinRoomButton?.addEventListener("click", () => {
       const selected = this.roomSelect?.value;
@@ -92,16 +97,19 @@ export class UIController {
   }
 
   showRoomStatus(roomId) {
-    if (!roomId) return;
-    if (this.roomSelect) {
+    if (!this.roomSelect) return;
+    if (roomId && (!this.userSelectedRoomId || this.userSelectedRoomId === roomId)) {
       this.roomSelect.value = roomId;
+      this.userSelectedRoomId = null;
     }
+    this.updateJoinButtonState();
     this.renderMatchStatus();
   }
 
   updateRooms(rooms) {
     if (!this.roomSelect) return;
     const currentValue = this.state.roomId;
+    const preferredValue = this.userSelectedRoomId ?? currentValue ?? "";
     const optionsHtml = rooms
       .slice()
       .sort((a, b) => a.id.localeCompare(b.id))
@@ -112,17 +120,21 @@ export class UIController {
       })
       .join("");
     this.roomSelect.innerHTML = optionsHtml;
-    if (currentValue) {
-      this.roomSelect.value = currentValue;
+    if (preferredValue) {
+      const option = this.roomSelect.querySelector(`option[value="${preferredValue}"]`);
+      if (option) {
+        this.roomSelect.value = preferredValue;
+      }
     }
     if (!this.roomSelect.value && rooms.length > 0) {
       this.roomSelect.selectedIndex = 0;
-    }
-    if (this.joinRoomButton) {
       const selected = this.roomSelect.value;
-      this.joinRoomButton.disabled =
-        rooms.length === 0 || !selected || selected === this.state.roomId;
+      this.userSelectedRoomId = selected && selected !== this.state.roomId ? selected : null;
     }
+    if (rooms.length === 0) {
+      this.userSelectedRoomId = null;
+    }
+    this.updateJoinButtonState();
   }
 
   updateBars() {
@@ -199,5 +211,12 @@ export class UIController {
       this.statusText.textContent = `${roomText}${summary}`;
       this.statusText.classList.remove("status--error");
     }
+  }
+
+  updateJoinButtonState() {
+    if (!this.joinRoomButton || !this.roomSelect) return;
+    const selected = this.roomSelect.value;
+    this.joinRoomButton.disabled =
+      !selected || selected === this.state.roomId || this.roomSelect.options.length === 0;
   }
 }
