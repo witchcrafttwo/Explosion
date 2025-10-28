@@ -57,8 +57,24 @@ export class NetworkClient {
     this.send("skill");
   }
 
-  requestRestart() {
-    this.send("restart");
+  sendGrenade() {
+    this.send("grenade");
+  }
+
+  sendHoming() {
+    this.send("homing");
+  }
+
+  joinRoom(roomId) {
+    this.send("joinRoom", { roomId });
+  }
+
+  createRoom() {
+    this.send("createRoom");
+  }
+
+  sendReady(ready) {
+    this.send("ready", { ready });
   }
 
   dispose() {
