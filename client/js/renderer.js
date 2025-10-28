@@ -3,6 +3,15 @@ const ARENA_HEIGHT = 600;
 const TANK_RADIUS = 22;
 const BULLET_RADIUS = 6;
 
+function colorWithAlpha(hex, alpha) {
+  const sanitized = hex.replace("#", "");
+  const value = parseInt(sanitized, 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export class Renderer {
   constructor(canvas, state) {
     this.canvas = canvas;
@@ -21,6 +30,8 @@ export class Renderer {
     this.lastTimestamp = timestamp;
     ctx.clearRect(0, 0, ARENA_WIDTH, ARENA_HEIGHT);
     this.drawBackground(ctx);
+    this.drawPaint(ctx);
+    this.drawObstacles(ctx);
     this.drawPlayers(ctx);
     this.drawBullets(ctx);
     requestAnimationFrame(this.boundRender);
@@ -49,6 +60,42 @@ export class Renderer {
       ctx.lineTo(ARENA_WIDTH - 40, y);
       ctx.stroke();
     }
+    ctx.restore();
+  }
+
+  drawPaint(ctx) {
+    ctx.save();
+    this.state.paintPatches.forEach((patch) => {
+      const color = this.getPlayerColor(patch.owner);
+      if (!color) return;
+      const radius = patch.radius || 40;
+      const gradient = ctx.createRadialGradient(patch.x, patch.y, radius * 0.2, patch.x, patch.y, radius);
+      gradient.addColorStop(0, colorWithAlpha(color, 0.45));
+      gradient.addColorStop(1, colorWithAlpha(color, 0));
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(patch.x, patch.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  drawObstacles(ctx) {
+    ctx.save();
+    ctx.fillStyle = "rgba(22, 33, 52, 0.88)";
+    ctx.strokeStyle = "rgba(90, 140, 220, 0.35)";
+    ctx.lineWidth = 2;
+    this.state.obstacles.forEach((obstacle) => {
+      if (typeof ctx.roundRect === "function") {
+        ctx.beginPath();
+        ctx.roundRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height, 12);
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+        ctx.strokeRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+      }
+    });
     ctx.restore();
   }
 
@@ -106,21 +153,63 @@ export class Renderer {
   drawBullets(ctx) {
     ctx.save();
     this.state.bullets.forEach((bullet) => {
-      const gradient = ctx.createRadialGradient(
-        bullet.x,
-        bullet.y,
-        0,
-        bullet.x,
-        bullet.y,
-        BULLET_RADIUS
-      );
-      gradient.addColorStop(0, "#fff");
-      gradient.addColorStop(1, "#ff995c");
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(bullet.x, bullet.y, BULLET_RADIUS, 0, Math.PI * 2);
-      ctx.fill();
+      let radius = BULLET_RADIUS;
+      if (bullet.type === "grenade") {
+        radius += 2;
+      } else if (bullet.type === "homing") {
+        radius += 1;
+      }
+      const color = this.getPlayerColor(bullet.owner) ?? "#ff995c";
+      if (bullet.type === "grenade") {
+        ctx.fillStyle = colorWithAlpha("#ffbe55", 0.95);
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = colorWithAlpha("#ff7a2e", 0.8);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, radius + 2, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (bullet.type === "homing") {
+        const gradient = ctx.createRadialGradient(bullet.x, bullet.y, 0, bullet.x, bullet.y, radius);
+        gradient.addColorStop(0, "#ffffff");
+        gradient.addColorStop(1, colorWithAlpha("#b884ff", 0.9));
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = colorWithAlpha("#e8c2ff", 0.7);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, radius + 3, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        const gradient = ctx.createRadialGradient(bullet.x, bullet.y, 0, bullet.x, bullet.y, radius);
+        gradient.addColorStop(0, "#ffffff");
+        gradient.addColorStop(1, colorWithAlpha(color, 0.9));
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
     });
     ctx.restore();
+  }
+
+  getPlayerColor(playerId) {
+    if (!playerId) return null;
+    if (playerId === this.state.playerId) {
+      return "#5fffd7";
+    }
+    const index = this.state.players.findIndex((p) => p.id === playerId);
+    if (index === -1) {
+      return "#58a7ff";
+    }
+    if (this.state.players.length <= 2) {
+      return playerId === this.state.playerId ? "#5fffd7" : "#58a7ff";
+    }
+    const palette = ["#58a7ff", "#ff8fa2", "#ffd966", "#7cf0ff"];
+    const offset = playerId === this.state.playerId ? 0 : 1;
+    return palette[(index + offset) % palette.length];
   }
 }
