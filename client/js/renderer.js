@@ -104,13 +104,13 @@ export class Renderer {
 
     this.lastTimestamp = timestamp;
 
-    // 背景 → 障害物（実体）→ 塗り → プレイヤー → 弾 → 障害物アウトライン
+    // 背景 → 障害物（実体）→ 塗り → プレイヤー → 障害物アウトライン → 弾
     this.drawBackground(ctx);
     this.drawObstacles(ctx);           // 実体（塗りの前）
     this.drawPaint(ctx);               // グリッド塗り
     this.drawPlayers(ctx);             // 犬/猫
-    this.drawBullets(ctx);
-    this.drawObstaclesOutline(ctx);    // 最前面に枠
+    this.drawObstaclesOutline(ctx);    // プレイヤーより前に枠線
+    this.drawBullets(ctx);             // 全ての弾を最上位レイヤーに
 
     requestAnimationFrame(this.boundRender);
   }
@@ -299,7 +299,7 @@ drawPaint(ctx) {
   }
 
 
-  // === 障害物の見やすい枠（最前面） ===
+  // === 障害物の見やすい枠（プレイヤーの前面） ===
   drawObstaclesOutline(ctx) {
     const obs = this.state.obstacles || [];
     ctx.strokeStyle = "rgba(100,220,255,0.9)";
