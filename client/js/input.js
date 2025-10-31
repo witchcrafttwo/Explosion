@@ -9,7 +9,7 @@ export const KEY_BINDINGS = {
   KeyW: "up",
   KeyS: "down",
   KeyA: "left",
-  KeyD: "shoot",
+  KeyD: "right",
   Space: "skill",
   KeyR: "readyToggle",
   KeyF: "grenade",
