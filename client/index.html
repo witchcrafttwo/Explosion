@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ドッカン戦車バトル Online</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <main class="layout">
+    <section class="hud">
+      <div class="hud__item">
+        <span class="label">ドッカンゲージ</span>
+        <progress id="skill-bar" max="100" value="0"></progress>
+      </div>
+      <div class="hud__item hud__item--timer">
+        <span class="label">残り時間</span>
+        <span id="match-timer">45.0s</span>
+      </div>
+      <div class="hud__item hud__item--ink">
+        <span class="label">塗り状況</span>
+        <div class="ink-meter" aria-hidden="true">
+          <div id="ink-meter-self" class="ink-meter__segment"></div>
+          <div id="ink-meter-opponent" class="ink-meter__segment"></div>
+        </div>
+        <div class="ink-meter__labels">
+          <span id="ink-meter-self-label">0%</span>
+          <span id="ink-meter-opponent-label">0%</span>
+        </div>
+      </div>
+      <div class="hud__item hud__item--abilities">
+        <span class="label">特殊弾クールダウン</span>
+        <div class="ability-list">
+          <div class="ability-list__item">
+            <span class="ability-list__label">F: グレネード</span>
+            <div class="ability-meter" data-ability="grenade">
+              <div id="grenade-meter" class="ability-meter__fill"></div>
+            </div>
+            <span id="grenade-timer" class="ability-meter__time">READY</span>
+          </div>
+          <div class="ability-list__item">
+            <span class="ability-list__label">G: ホーミング</span>
+            <div class="ability-meter" data-ability="homing">
+              <div id="homing-meter" class="ability-meter__fill"></div>
+            </div>
+            <span id="homing-timer" class="ability-meter__time">READY</span>
+          </div>
+        </div>
+      </div>
+      <div class="hud__item">
+        <span class="label">ステータス</span>
+        <span id="status-text">サーバー接続中...</span>
+      </div>
+    </section>
+
+    <section class="viewport">
+      <canvas id="game" width="960" height="600"></canvas>
+    </section>
+
+    <section class="controls">
+      <div class="room-selector">
+        <h2>ルーム選択</h2>
+        <p class="room-selector__hint">一覧からルームを選んで「参加」または新規作成してください。</p>
+        <div class="room-selector__row">
+          <select id="room-select" aria-label="ルーム一覧">
+            <option value="" disabled selected>読み込み中...</option>
+          </select>
+          <button id="join-room-button" type="button">このルームに参加</button>
+        </div>
+        <button id="create-room-button" type="button" class="room-selector__create">新しいルームを作成</button>
+      </div>
+      <div class="match-ready">
+        <h2>対戦準備</h2>
+        <p id="match-status-detail" class="match-ready__detail">対戦相手を待っています</p>
+        <button id="ready-button" type="button" class="ready-button" disabled>準備完了</button>
+      </div>
+      <div>
+        <h2>操作</h2>
+        <ul>
+          <li>移動: WASD / 矢印キー</li>
+          <li>砲塔: マウスで照準</li>
+          <li>射撃: 左クリック</li>
+          <li>ドッカン: ゲージ100%でスペースキー</li>
+          <li>グレネード弾: Fキー (10秒ごと)</li>
+          <li>ホーミング弾: Gキー (7秒ごと)</li>
+          <li>準備完了の切り替え: Rキー</li>
+          <li>勝敗: 塗り% + HP残量% の合計で決定</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <div id="matchmaking-overlay" class="overlay hidden">
+    <div class="overlay__panel">
+      <h1>対戦相手を検索中...</h1>
+      <p>相手が接続すると自動で開始します。</p>
+    </div>
+  </div>
+
+  <div id="result-overlay" class="overlay hidden">
+    <div class="overlay__panel">
+      <h1 id="result-text"></h1>
+      <div id="result-details" class="result-details"></div>
+      <button id="restart-button">準備完了 (R)</button>
+    </div>
+  </div>
+
+  <div id="countdown-overlay" class="overlay hidden" aria-live="assertive">
+    <div class="overlay__panel overlay__panel--countdown">
+      <span id="countdown-text" class="countdown-text"></span>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
