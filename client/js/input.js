@@ -16,23 +16,41 @@ export const KEY_BINDINGS = {
   KeyG: "homing",
 };
 
+export const CONTROL_MODES = Object.freeze({
+  CLICK_MOVE: "clickMove",
+  CLASSIC: "classic",
+});
+
 export class InputController {
   constructor(
     canvas,
-    { onInputChange, onSkill, onToggleReady, onGrenade, onHoming, onShoot, invertY = false } = {}
+    {
+      onInputChange,
+      onSkill,
+      onToggleReady,
+      onGrenade,
+      onHoming,
+      onShoot,
+      invertY = false,
+      controlMode = CONTROL_MODES.CLICK_MOVE,
+    } = {}
   ) {
     this.canvas = canvas;
     this.mousePos = { x: 0, y: 0 };
-    this.mouseDown = false;
-    this.pointerId = null;
 
     this.playerPos = { x: 0, y: 0 };
     this.hasPlayerPos = false;
     this.playerPosProvider = null;
 
-    this.mouseDeadzone = 2;
     this.eps = 1e-3;
     this.invertY = invertY;
+
+    this.keyState = { up: false, down: false, left: false, right: false };
+    this.controlMode = CONTROL_MODES.CLICK_MOVE;
+    this.moveTarget = null;
+    this.arrivalThreshold = 12;
+    this.movePointerId = null;
+    this.shootingPointerId = null;
 
     this.onInputChange = onInputChange;
     this.onSkill = onSkill;
@@ -40,7 +58,8 @@ export class InputController {
     this.onGrenade = onGrenade;
     this.onHoming = onHoming;
     this.onShoot = onShoot;
-    this.shootHeld = false;
+    this.shootPointerHeld = false;
+    this.shootKeyHeld = false;
 
     this._lastInput = null;
     this._rafId = null;
@@ -52,6 +71,8 @@ export class InputController {
     this.boundPointerDown = (e) => this.handlePointerDown(e);
     this.boundPointerUp = (e) => this.handlePointerUp(e);
     this.boundContextMenu = (e) => e.preventDefault();
+
+    this.setControlMode(controlMode);
   }
 
   start() {
@@ -81,6 +102,8 @@ export class InputController {
 
     if (this._rafId) cancelAnimationFrame(this._rafId);
     this._rafId = null;
+
+    this._resetMovementState();
   }
 
   setPlayerPositionProvider(getterFn) { this.playerPosProvider = getterFn; }
@@ -90,43 +113,95 @@ export class InputController {
     const action = KEY_BINDINGS[event.code];
     if (!action) return;
 
-    if (action === "shoot") {
-      if (!this.shootHeld && !event.repeat) this.onShoot?.();
-      this.shootHeld = true;
-    } else if (action === "skill") this.onSkill?.();
-    else if (action === "readyToggle") this.onToggleReady?.();
-    else if (action === "grenade") this.onGrenade?.();
-    else if (action === "homing") this.onHoming?.();
+    switch (action) {
+      case "shoot":
+        if (!this.shootKeyHeld && !event.repeat) this.onShoot?.();
+        this.shootKeyHeld = true;
+        break;
+      case "skill":
+        this.onSkill?.();
+        break;
+      case "readyToggle":
+        this.onToggleReady?.();
+        break;
+      case "grenade":
+        this.onGrenade?.();
+        break;
+      case "homing":
+        this.onHoming?.();
+        break;
+      case "up":
+      case "down":
+      case "left":
+      case "right":
+        this.keyState[action] = true;
+        break;
+      default:
+        break;
+    }
 
     event.preventDefault();
   }
 
   handleKeyup(event) {
     const action = KEY_BINDINGS[event.code];
-    if (action === "shoot") this.shootHeld = false;
+    if (!action) return;
+
+    let handled = false;
+    if (action === "shoot") {
+      this.shootKeyHeld = false;
+      handled = true;
+    } else if (action === "up" || action === "down" || action === "left" || action === "right") {
+      this.keyState[action] = false;
+      handled = true;
+    }
+
+    if (handled) event.preventDefault();
   }
 
   handlePointerDown(e) {
-    if (!e.isPrimary || e.button !== 0) return;
-    this.pointerId = e.pointerId;
-    this.mouseDown = true;
-    this.canvas.setPointerCapture?.(this.pointerId);
+    if (!e.isPrimary) return;
     this.mousePos = this._eventToCanvasXY(e);
-    e.preventDefault();
+
+    if (e.button === 2) {
+      if (this.controlMode === CONTROL_MODES.CLICK_MOVE) {
+        this._beginClickMove(e.pointerId, this.mousePos);
+      } else {
+        this._startPointerShooting(e);
+      }
+      e.preventDefault();
+      return;
+    }
+
+    if (e.button === 0) {
+      this._startPointerShooting(e);
+      e.preventDefault();
+    }
   }
 
   handlePointerUp(e) {
     if (!e.isPrimary) return;
-    if (this.pointerId === e.pointerId) {
-      this.mouseDown = false;
-      this.pointerId = null;
+
+    if (this.movePointerId === e.pointerId) {
+      this.movePointerId = null;
+      try { this.canvas.releasePointerCapture?.(e.pointerId); } catch {}
+    }
+
+    if (this.shootingPointerId === e.pointerId) {
+      this.shootingPointerId = null;
+      this.shootPointerHeld = false;
       try { this.canvas.releasePointerCapture?.(e.pointerId); } catch {}
     }
   }
 
   handlePointerMove(e) {
-    if (this.pointerId !== null && e.pointerId !== this.pointerId) return;
-    this.mousePos = this._eventToCanvasXY(e);
+    if (!e.isPrimary) return;
+    const pos = this._eventToCanvasXY(e);
+    this.mousePos = pos;
+
+    if (this.controlMode === CONTROL_MODES.CLICK_MOVE && this.movePointerId === e.pointerId) {
+      this.moveTarget = { ...pos };
+    }
   }
 
   _update() {
@@ -141,27 +216,59 @@ export class InputController {
       ? { x: this.playerPos.x, y: this.playerPos.y }
       : { x: this.canvas.width / 2, y: this.canvas.height / 2 };
 
-    let dx = this.mousePos.x - origin.x;
-    let dy = this.mousePos.y - origin.y;
-    if (this.invertY) dy = -dy;
+    const keyboard = this.keyState;
+    const manualInput = keyboard.up || keyboard.down || keyboard.left || keyboard.right;
 
-    const dist = Math.hypot(dx, dy);
-    let moveX = 0, moveY = 0;
-    if (this.mouseDown && dist > this.mouseDeadzone) {
-      const inv = 1 / dist;
-      moveX = dx * inv;
-      moveY = dy * inv;
+    let moveX = 0;
+    let moveY = 0;
+    let up = false;
+    let down = false;
+    let left = false;
+    let right = false;
+
+    if (this.controlMode === CONTROL_MODES.CLASSIC || manualInput) {
+      const rawX = (keyboard.right ? 1 : 0) - (keyboard.left ? 1 : 0);
+      const rawY = (keyboard.down ? 1 : 0) - (keyboard.up ? 1 : 0);
+      const length = Math.hypot(rawX, rawY) || 1;
+      if (rawX !== 0 || rawY !== 0) {
+        moveX = rawX / length;
+        moveY = rawY / length;
+      }
+      up = keyboard.up;
+      down = keyboard.down;
+      left = keyboard.left;
+      right = keyboard.right;
+      if (this.controlMode === CONTROL_MODES.CLICK_MOVE && manualInput) {
+        this.moveTarget = null;
+      }
+    } else if (this.controlMode === CONTROL_MODES.CLICK_MOVE && this.moveTarget) {
+      const dx = this.moveTarget.x - origin.x;
+      const dy = this.moveTarget.y - origin.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > this.arrivalThreshold) {
+        const inv = 1 / dist;
+        moveX = dx * inv;
+        moveY = dy * inv;
+        up = moveY < -this.eps;
+        down = moveY > this.eps;
+        left = moveX < -this.eps;
+        right = moveX > this.eps;
+      } else {
+        this.moveTarget = null;
+      }
     }
 
+    const aimY = this.invertY ? this.canvas.height - this.mousePos.y : this.mousePos.y;
     const input = {
-      up:   moveY < -this.eps,
-      down: moveY >  this.eps,
-      left: moveX < -this.eps,
-      right:moveX >  this.eps,
-      moveX, moveY,
-      shooting: !!this.shootHeld,
+      up,
+      down,
+      left,
+      right,
+      moveX,
+      moveY,
+      shooting: this.shootPointerHeld || this.shootKeyHeld,
       aimX: this.mousePos.x,
-      aimY: this.invertY ? (this.canvas.height - this.mousePos.y) : this.mousePos.y,
+      aimY,
     };
 
     if (!this._approxEqualInput(input, this._lastInput)) {
@@ -192,7 +299,70 @@ export class InputController {
       near(a.aimX, b.aimX) && near(a.aimY, b.aimY)
     );
   }
+
+  getControlMode() {
+    return this.controlMode;
+  }
+
+  setControlMode(mode) {
+    const normalized =
+      mode === CONTROL_MODES.CLASSIC ? CONTROL_MODES.CLASSIC : CONTROL_MODES.CLICK_MOVE;
+    if (this.controlMode === normalized) {
+      return this.controlMode;
+    }
+    this.controlMode = normalized;
+    this._resetMovementState();
+    return this.controlMode;
+  }
+
+  toggleControlMode() {
+    const next =
+      this.controlMode === CONTROL_MODES.CLICK_MOVE
+        ? CONTROL_MODES.CLASSIC
+        : CONTROL_MODES.CLICK_MOVE;
+    return this.setControlMode(next);
+  }
+
+  _beginClickMove(pointerId, target) {
+    this.moveTarget = { ...target };
+    this.movePointerId = pointerId;
+    try {
+      this.canvas.setPointerCapture?.(pointerId);
+    } catch {}
+  }
+
+  _startPointerShooting(e) {
+    if (this.shootingPointerId !== null && this.shootingPointerId !== e.pointerId) {
+      try { this.canvas.releasePointerCapture?.(this.shootingPointerId); } catch {}
+    }
+    this.shootingPointerId = e.pointerId;
+    this.shootPointerHeld = true;
+    try {
+      this.canvas.setPointerCapture?.(e.pointerId);
+    } catch {}
+    if (!this.shootKeyHeld) {
+      this.onShoot?.();
+    }
+  }
+
+  _resetMovementState() {
+    if (this.movePointerId !== null) {
+      try { this.canvas.releasePointerCapture?.(this.movePointerId); } catch {}
+    }
+    if (this.shootingPointerId !== null) {
+      try { this.canvas.releasePointerCapture?.(this.shootingPointerId); } catch {}
+    }
+    this.movePointerId = null;
+    this.moveTarget = null;
+    this.keyState = { up: false, down: false, left: false, right: false };
+    this.shootingPointerId = null;
+    this.shootPointerHeld = false;
+    this.shootKeyHeld = false;
+    this._lastInput = null;
+  }
 }
+
+InputController.CONTROL_MODES = CONTROL_MODES;
 
 export const HUD = {
   _labelWidthCache: new Map(), // "font|text" -> width

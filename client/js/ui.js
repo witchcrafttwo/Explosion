@@ -1,5 +1,5 @@
 // ui.js
-import { HUD } from "./input.js";
+import { HUD, CONTROL_MODES } from "./input.js";
 
 export class UIController {
   constructor(state) {
@@ -29,6 +29,10 @@ export class UIController {
     this.homingMeter = document.getElementById("homing-meter");
     this.grenadeTimer = document.getElementById("grenade-timer");
     this.homingTimer = document.getElementById("homing-timer");
+    this.controlModeToggle = document.getElementById("control-mode-toggle");
+    this.controlModeStatus = document.getElementById("control-mode-status");
+    this.controlInstructionMove = document.getElementById("control-instruction-move");
+    this.controlInstructionShoot = document.getElementById("control-instruction-shoot");
 
     this.defaultMatchSeconds = 45;
     this.statusResetTimer = null;
@@ -69,6 +73,11 @@ export class UIController {
     this.createRoomButton?.addEventListener("click", this._onCreate);
   }
 
+  bindControlModeToggle(handler) {
+    this._onControlModeToggle = () => handler?.();
+    this.controlModeToggle?.addEventListener("click", this._onControlModeToggle);
+  }
+
   destroy() {
     clearTimeout(this.statusResetTimer);
     this.restartButton?.removeEventListener("click", this._onRestart);
@@ -77,6 +86,7 @@ export class UIController {
     this.roomSelect?.removeEventListener("blur", this._onRoomBlur);
     this.joinRoomButton?.removeEventListener("click", this._onJoin);
     this.createRoomButton?.removeEventListener("click", this._onCreate);
+    this.controlModeToggle?.removeEventListener("click", this._onControlModeToggle);
   }
 
   // ===== HUD呼び出し =====
@@ -98,6 +108,30 @@ export class UIController {
       this.statusText.classList.toggle("status--error", error);
     }
     this.notificationActive = lock;
+  }
+
+  updateControlMode(mode) {
+    const isClickMove = mode === CONTROL_MODES.CLICK_MOVE;
+    if (this.controlModeStatus) {
+      this.controlModeStatus.textContent = isClickMove
+        ? "現在: クリック移動モード"
+        : "現在: クラシックモード (WASD + 右クリック射撃)";
+    }
+    if (this.controlModeToggle) {
+      this.controlModeToggle.textContent = isClickMove
+        ? "クラシック操作に切り替え"
+        : "クリック移動に切り替え";
+    }
+    if (this.controlInstructionMove) {
+      this.controlInstructionMove.textContent = isClickMove
+        ? "移動: 右クリックで移動先を指定（もう一度で更新）"
+        : "移動: WASD / 矢印キー";
+    }
+    if (this.controlInstructionShoot) {
+      this.controlInstructionShoot.textContent = isClickMove
+        ? "射撃: 左クリック（右クリックは移動）"
+        : "射撃: 右クリック（左クリックでも可）";
+    }
   }
 
   showMatchmaking(show) {

@@ -49,6 +49,11 @@ export class ClientState {
     this.roomId = roomId;
   }
 
+  getLocalPlayer() {
+    if (!this.playerId) return null;
+    return this.players.find((p) => p.id === this.playerId) ?? null;
+  }
+
   updateMatchStatus({ phase, players }) {
     this.matchPhase = phase;
     if (!Array.isArray(players)) {

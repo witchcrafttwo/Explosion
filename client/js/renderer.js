@@ -225,23 +225,78 @@ drawPaint(ctx) {
   }
 
   drawBullets(ctx) {
-  const bullets = this.state.bullets || [];
-  const players = this.state.players || [];
+    const bullets = this.state.bullets || [];
+    if (!bullets.length) return;
 
-  bullets.forEach((b) => {
-    const owner = players.find((p) => p.id === b.owner);
-    const avatar = this.getAvatarFor(owner) || "dog";
+    const players = this.state.players || [];
+    const playerMap = new Map(players.map((p) => [p.id, p]));
 
-    // 色分け：犬→オレンジ、猫→紫
-    if (avatar === "dog") ctx.fillStyle = "#ff8c00";
-    else if (avatar === "cat") ctx.fillStyle = "#b266ff";
-    else ctx.fillStyle = "#61f6e5"; // fallback
+    const specials = [];
+    const normals = [];
+    bullets.forEach((bullet) => {
+      if (bullet.type === "grenade" || bullet.type === "homing") {
+        specials.push(bullet);
+      } else {
+        normals.push(bullet);
+      }
+    });
 
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
-    ctx.fill();
-  });
-}
+    const colorForOwner = (ownerId) => {
+      const owner = ownerId ? playerMap.get(ownerId) : null;
+      const avatar = owner ? this.getAvatarFor(owner) : null;
+      if (avatar === "dog") return "#ff8c00";
+      if (avatar === "cat") return "#b266ff";
+      return "#61f6e5";
+    };
+
+    normals.forEach((bullet) => {
+      ctx.fillStyle = colorForOwner(bullet.owner);
+      ctx.beginPath();
+      ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    const specialStyles = {
+      grenade: {
+        radius: 9,
+        fill: "#ff6ad5",
+        glow: "rgba(255, 122, 222, 0.55)",
+      },
+      homing: {
+        radius: 7,
+        fill: "#ffb347",
+        glow: "rgba(255, 179, 71, 0.5)",
+      },
+    };
+
+    specials.forEach((bullet) => {
+      const style = specialStyles[bullet.type];
+      if (!style) return;
+
+      ctx.save();
+      ctx.shadowColor = style.glow;
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = style.fill;
+      ctx.beginPath();
+      ctx.arc(bullet.x, bullet.y, style.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(255,255,255,0.9)";
+      ctx.beginPath();
+      ctx.arc(bullet.x, bullet.y, style.radius - 1, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "rgba(0,0,0,0.25)";
+      ctx.beginPath();
+      ctx.arc(bullet.x, bullet.y, style.radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.restore();
+    });
+  }
 
 
   // === 障害物の見やすい枠（最前面） ===

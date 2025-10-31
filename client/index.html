@@ -77,15 +77,20 @@
       <div>
         <h2>操作</h2>
         <ul>
-          <li>移動: WASD / 矢印キー</li>
+          <li id="control-instruction-move">移動: 右クリックで移動先を指定（もう一度で更新）</li>
           <li>砲塔: マウスで照準</li>
-          <li>射撃: 左クリック</li>
+          <li id="control-instruction-shoot">射撃: 左クリック（右クリックは移動）</li>
           <li>ドッカン: ゲージ100%でスペースキー</li>
           <li>グレネード弾: Fキー (10秒ごと)</li>
           <li>ホーミング弾: Gキー (7秒ごと)</li>
           <li>準備完了の切り替え: Rキー</li>
           <li>勝敗: 塗り% + HP残量% の合計で決定</li>
         </ul>
+        <div class="control-mode">
+          <p id="control-mode-status" class="control-mode__status">現在: クリック移動モード</p>
+          <button id="control-mode-toggle" type="button">クラシック操作に切り替え</button>
+          <p class="control-mode__hint">プレイ中でもいつでも切り替えできます。</p>
+        </div>
       </div>
     </section>
   </main>

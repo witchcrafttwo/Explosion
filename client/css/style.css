@@ -245,6 +245,31 @@ select {
   padding-left: 1.4rem;
 }
 
+.control-mode {
+  margin-top: 1.25rem;
+  padding: 0.85rem 1.1rem;
+  background: rgba(15, 32, 52, 0.6);
+  border-radius: 12px;
+  border: 1px solid rgba(94, 151, 255, 0.25);
+  display: grid;
+  gap: 0.6rem;
+}
+
+.control-mode__status {
+  margin: 0;
+  font-weight: 600;
+}
+
+.control-mode__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.control-mode button {
+  justify-self: start;
+}
+
 .overlay {
   position: fixed;
   inset: 0;
