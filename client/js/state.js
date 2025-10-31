@@ -11,6 +11,7 @@ export class ClientState {
     this.matchPhase = "waiting";
     this.paintPatches = [];
     this.paintStats = [];
+    this.paintGrid = []; // ★ 追加：サーバーから受け取る塗りグリッド
     this.obstacles = [];
     this.matchTimeRemaining = 0;
     this.cooldowns = { grenade: 0, homing: 0 };
@@ -28,6 +29,7 @@ export class ClientState {
     }
     this.paintPatches = paint?.patches ?? [];
     this.paintStats = paint?.stats ?? [];
+    this.paintGrid = paint?.grid ?? []; // ★ 追加
     this.obstacles = obstacles ?? [];
     this.matchTimeRemaining = matchTimeRemaining ?? 0;
 
@@ -45,6 +47,11 @@ export class ClientState {
   setIdentity({ playerId, roomId }) {
     this.playerId = playerId;
     this.roomId = roomId;
+  }
+
+  getLocalPlayer() {
+    if (!this.playerId) return null;
+    return this.players.find((p) => p.id === this.playerId) ?? null;
   }
 
   updateMatchStatus({ phase, players }) {

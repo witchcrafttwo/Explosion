@@ -22,6 +22,7 @@ import {
 
 const TWO_PI = Math.PI * 2;
 const MAX_BULLET_BOUNCES = 1;
+// 残しておくが、今回「消さない」方針なので実質未使用
 const PAINT_PATCH_LIMIT = 320;
 
 export class GameRoom {
@@ -179,7 +180,7 @@ export class GameRoom {
     this.matchOver = false;
     this.phase = "active";
     this.readyPlayers.clear();
-    this.resetPaintField();
+    this.resetPaintField(); // 新しい試合の開始で塗りをリセット
     this.matchStartTime = Date.now();
     this.players.forEach((player) => {
       this.send(player.id, { type: "skillConsumed" });
@@ -201,7 +202,7 @@ export class GameRoom {
     this.readyPlayers.clear();
     this.skillReady.clear();
     this.matchStartTime = 0;
-    this.resetPaintField();
+    this.resetPaintField(); // ロビーでは毎回初期化
     this.obstacles = [];
     this.players.forEach((player) => {
       this.send(player.id, { type: "skillConsumed" });
@@ -302,8 +303,6 @@ export class GameRoom {
       bounces: 0,
       createdAt: Date.now(),
       type: "normal",
-      pendingPaintAt: null,
-      lastBounceAt: 0,
     };
     this.bullets.set(bullet.id, bullet);
   }
@@ -346,6 +345,23 @@ export class GameRoom {
     this.bullets.set(bullet.id, bullet);
   }
 
+  // === 通常弾の移動経路をサンプリングして塗る（トレイル塗り） ===
+  applyPaintTrail(ownerId, x0, y0, x1, y1, radius) {
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const dist = Math.hypot(dx, dy);
+    if (dist === 0) return;
+    // サンプリング間隔（小さいほど連続、負荷↑）
+    const STEP = Math.max(8, radius * 0.4);
+    const steps = Math.ceil(dist / STEP);
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const px = x0 + dx * t;
+      const py = y0 + dy * t;
+      this.applyPaint(ownerId, px, py, radius);
+    }
+  }
+
   updateBullets(delta) {
     const bounds = {
       minX: ARENA.padding,
@@ -368,6 +384,7 @@ export class GameRoom {
 
       let bounced = false;
 
+      // 壁反射
       if (bullet.x <= bounds.minX + BULLET_RADIUS || bullet.x >= bounds.maxX - BULLET_RADIUS) {
         if (bullet.type === "grenade") {
           this.explodeGrenade(id, bullet);
@@ -401,11 +418,10 @@ export class GameRoom {
         }
       }
 
+      // 障害物
       if (bullet.type !== "grenade") {
         for (const obstacle of this.obstacles) {
-          if (!circleRectCollision(bullet.x, bullet.y, BULLET_RADIUS, obstacle)) {
-            continue;
-          }
+          if (!circleRectCollision(bullet.x, bullet.y, BULLET_RADIUS, obstacle)) continue;
           if (bullet.type === "normal" && bullet.bounces >= MAX_BULLET_BOUNCES) {
             this.bullets.delete(id);
             return;
@@ -434,15 +450,11 @@ export class GameRoom {
         }
       }
 
+      // === 通常弾：経路全部塗る（半径 = BULLET_RADIUS） ===
       if (bullet.type === "normal") {
-        if (bounced && !bullet.pendingPaintAt) {
-          bullet.pendingPaintAt = now + 1500;
-        }
-        if (bullet.pendingPaintAt && now >= bullet.pendingPaintAt) {
-          this.applyPaint(bullet.owner, bullet.x, bullet.y, PAINT_RADIUS_NORMAL);
-          this.bullets.delete(id);
-          return;
-        }
+        this.applyPaintTrail(bullet.owner, prevX, prevY, bullet.x, bullet.y, BULLET_RADIUS);
+
+        // 寿命（掃除）
         if (now - bullet.createdAt > 7000) {
           this.bullets.delete(id);
         }
@@ -480,7 +492,7 @@ export class GameRoom {
     if (!this.bullets.has(id)) return;
     this.bullets.delete(id);
     this.applyPaint(bullet.owner, bullet.x, bullet.y, PAINT_RADIUS_GRENADE);
-    const damage = 34;
+    const damage = 25;
     this.players.forEach((player) => {
       if (player.id === bullet.owner || player.hp <= 0) return;
       const dist = Math.hypot(player.x - bullet.x, player.y - bullet.y);
@@ -494,16 +506,36 @@ export class GameRoom {
   applyPaint(ownerId, x, y, radius) {
     if (!ownerId) return;
     this.recordPaintPatch(ownerId, x, y, radius);
+
     const cellHalfWidth = this.paintCellWidth / 2;
     const cellHalfHeight = this.paintCellHeight / 2;
     const minX = ARENA.padding;
     const minY = ARENA.padding;
     const maxCol = PAINT_GRID_COLS - 1;
     const maxRow = PAINT_GRID_ROWS - 1;
+
+    // --- 半径がセルより小さい場合でも必ず1セルは塗る ---
+    const minCellRadius = Math.min(cellHalfWidth, cellHalfHeight);
+    if (radius < minCellRadius) {
+      const col = clamp(Math.floor((x - minX) / this.paintCellWidth), 0, maxCol);
+      const row = clamp(Math.floor((y - minY) / this.paintCellHeight), 0, maxRow);
+      const prevOwner = this.paintGrid[row][col];
+      if (prevOwner !== ownerId) {
+        if (prevOwner) {
+          const prevCount = this.paintCounts.get(prevOwner) || 0;
+          this.paintCounts.set(prevOwner, Math.max(0, prevCount - 1));
+        }
+        this.paintGrid[row][col] = ownerId;
+        this.paintCounts.set(ownerId, (this.paintCounts.get(ownerId) || 0) + 1);
+      }
+      return;
+    }
+
+    // --- 通常の円範囲塗り ---
     const startCol = clamp(Math.floor((x - radius - minX) / this.paintCellWidth), 0, maxCol);
-    const endCol = clamp(Math.floor((x + radius - minX) / this.paintCellWidth), 0, maxCol);
+    const endCol   = clamp(Math.floor((x + radius - minX) / this.paintCellWidth), 0, maxCol);
     const startRow = clamp(Math.floor((y - radius - minY) / this.paintCellHeight), 0, maxRow);
-    const endRow = clamp(Math.floor((y + radius - minY) / this.paintCellHeight), 0, maxRow);
+    const endRow   = clamp(Math.floor((y + radius - minY) / this.paintCellHeight), 0, maxRow);
 
     for (let row = startRow; row <= endRow; row += 1) {
       for (let col = startCol; col <= endCol; col += 1) {
@@ -523,17 +555,9 @@ export class GameRoom {
   }
 
   recordPaintPatch(ownerId, x, y, radius) {
-    this.paintPatches.push({
-      id: uuid(),
-      owner: ownerId,
-      x: round(x),
-      y: round(y),
-      radius: round(radius),
-      createdAt: Date.now(),
-    });
-    if (this.paintPatches.length > PAINT_PATCH_LIMIT) {
-      this.paintPatches.splice(0, this.paintPatches.length - PAINT_PATCH_LIMIT);
-    }
+    // タイル描画に移行：可視パッチは使わないので蓄積しない
+    // もし試合中エフェクトを残したければ、ここで push して serialize でも送る
+    return;
   }
 
   resetPaintField() {
@@ -564,14 +588,14 @@ export class GameRoom {
         }
 
         if (bullet.type === "homing") {
-          player.hp = Math.max(0, player.hp - 26);
+          player.hp = Math.max(0, player.hp - 15);
           this.applyPaint(bullet.owner, bullet.x, bullet.y, PAINT_RADIUS_HOMING);
           this.bullets.delete(id);
           break;
         }
 
         const owner = this.players.get(bullet.owner);
-        const damage = owner?.isSkillActive ? 35 : 20;
+        const damage = owner?.isSkillActive ? 25 : 10;
         player.hp = Math.max(0, player.hp - damage);
         this.bullets.delete(id);
         break;
@@ -609,6 +633,7 @@ export class GameRoom {
     });
     this.broadcast({ type: "state", payload: this.serialize() });
     this.broadcastMatchStatus();
+    // ※ 塗りは消さない。次の試合開始（beginMatch/prepareLobby）でリセット
   }
 
   calculateResults() {
@@ -633,10 +658,7 @@ export class GameRoom {
       }
     });
 
-    if (tie) {
-      winner = null;
-    }
-
+    if (tie) winner = null;
     return { winner, scores };
   }
 
@@ -665,8 +687,11 @@ export class GameRoom {
         type: bullet.type,
       })),
       paint: {
-        patches: this.paintPatches.slice(),
+        // タイル描画へ移行：パッチは送らない（軽量化）
+        patches: [],
         stats: this.getPaintStats(),
+        // ★ 追加：セルの所有者IDをそのまま送る（null / playerId）
+        grid: this.paintGrid,
       },
       obstacles: this.obstacles.map((obstacle) => ({
         x: round(obstacle.x),

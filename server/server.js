@@ -179,6 +179,7 @@ setInterval(() => {
   rooms.forEach((room) => room.update());
 }, 1000 / TICK_RATE);
 
-httpServer.listen(PORT, () => {
-  console.log(`ドッカン戦車バトル Online サーバー起動: http://localhost:${PORT}`);
+httpServer.listen(PORT, "0.0.0.0", () => {
+  console.log(`サーバー起動: http://localhost:${PORT}`);
 });
+
